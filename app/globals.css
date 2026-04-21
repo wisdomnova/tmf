@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer base {
+  :root {
+    --accent-orange: #f36b10;
+  }
+}
+
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-poppins), sans-serif;
+}
+
+a,
+button {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+a:hover, button:hover {
+  opacity: 0.8;
+}
+
+.hero-track {
+  animation: hero-slide 28s linear infinite;
+}
+
+.tmf-2025-track {
+  animation: tmf-2025-slide 140s linear infinite;
+}
+
+@keyframes hero-slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-300vw);
+  }
+}
+
+@keyframes tmf-2025-slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
