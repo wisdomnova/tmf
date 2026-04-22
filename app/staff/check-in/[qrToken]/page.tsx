@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import SignaturePad from "./signature-pad";
 import StaffAuthModal from "./staff-auth-modal";
 import CheckInSuccessModal from "./checkin-success-modal";
 import AlreadyCheckedInModal from "./already-checkedin-modal";
@@ -341,7 +340,23 @@ export default function StaffCheckInPage() {
                 >
                   Open full-screen signature
                 </button>
-                <SignaturePad onChange={setSignatureData} />
+                <div className="mx-auto w-full max-w-xl">
+                  <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-[#e8d9cf] bg-white p-3 shadow-inner">
+                    {signatureData ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={signatureData}
+                        alt="Signature preview"
+                        className="max-h-[96px] w-full object-contain"
+                      />
+                    ) : (
+                      <p className="text-center text-xs text-gray-500">
+                        Signature preview will appear here after you sign in
+                        full-screen mode.
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
                 {message ? <p className="text-sm text-emerald-700">{message}</p> : null}

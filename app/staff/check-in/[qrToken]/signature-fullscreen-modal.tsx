@@ -18,12 +18,18 @@ export default function SignatureFullscreenModal({
     <AnimatePresence>
       {open ? (
         <motion.div
-          className="fixed inset-0 z-[96] bg-[#f7f7f7]"
+          className="fixed inset-0 z-[96] flex items-center justify-center bg-black/50 px-4 py-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="mx-auto flex h-screen w-full max-w-4xl flex-col px-4 py-5 md:px-6">
+          <motion.section
+            className="w-full max-w-5xl rounded-2xl border border-white/20 bg-[#f7f7f7] p-4 shadow-2xl md:p-6"
+            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-orange)]">
@@ -42,10 +48,10 @@ export default function SignatureFullscreenModal({
               </button>
             </div>
 
-            <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-3 md:p-5">
-              <SignaturePad onChange={onChange} height={520} />
+            <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-5">
+              <SignaturePad onChange={onChange} height={460} />
             </div>
-          </div>
+          </motion.section>
         </motion.div>
       ) : null}
     </AnimatePresence>
