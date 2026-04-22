@@ -6,6 +6,7 @@ import SignaturePad from "./signature-pad";
 import StaffAuthModal from "./staff-auth-modal";
 import CheckInSuccessModal from "./checkin-success-modal";
 import AlreadyCheckedInModal from "./already-checkedin-modal";
+import SignatureFullscreenModal from "./signature-fullscreen-modal";
 import { motion } from "framer-motion";
 
 const API_BASE_URL =
@@ -47,8 +48,18 @@ export default function StaffCheckInPage() {
   const [needsAuth, setNeedsAuth] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAlreadyCheckedInModal, setShowAlreadyCheckedInModal] = useState(false);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!showSignatureModal) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showSignatureModal]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("tmf_staff_token");
@@ -229,6 +240,11 @@ export default function StaffCheckInPage() {
         checkedInAt={profile?.registration.checkedInAt || new Date().toISOString()}
         onClose={() => setShowAlreadyCheckedInModal(false)}
       />
+      <SignatureFullscreenModal
+        open={showSignatureModal}
+        onClose={() => setShowSignatureModal(false)}
+        onChange={setSignatureData}
+      />
       <motion.div
         className="mx-auto w-full max-w-6xl px-6"
         initial={{ opacity: 0, y: 20 }}
@@ -318,6 +334,13 @@ export default function StaffCheckInPage() {
                     Please ask attendee to sign below to confirm physical attendance.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSignatureModal(true)}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                >
+                  Open full-screen signature
+                </button>
                 <SignaturePad onChange={setSignatureData} />
 
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
