@@ -6,9 +6,14 @@ import { motion } from "framer-motion";
 type SignaturePadProps = {
   onChange: (value: string) => void;
   height?: number;
+  displayHeightClass?: string;
 };
 
-export default function SignaturePad({ onChange, height = 220 }: SignaturePadProps) {
+export default function SignaturePad({
+  onChange,
+  height = 220,
+  displayHeightClass = "h-[220px]",
+}: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
@@ -74,7 +79,7 @@ export default function SignaturePad({ onChange, height = 220 }: SignaturePadPro
         ref={canvasRef}
         width={1400}
         height={height}
-        className="w-full touch-none rounded-xl border border-[#e8d9cf] bg-white shadow-inner"
+        className={`w-full touch-none rounded-xl border border-[#e8d9cf] bg-white shadow-inner ${displayHeightClass}`}
         onPointerDown={start}
         onPointerMove={draw}
         onPointerUp={stop}
