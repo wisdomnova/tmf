@@ -15,9 +15,68 @@ const workSans = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "TMF Nigeria | TMF'26",
+  metadataBase: new URL("https://tmfnigeria.com"),
+  title: {
+    default: "TMF Nigeria | The Mechanization Forum",
+    template: "%s | TMF Nigeria",
+  },
   description:
-    "TMF'26 special edition: national agricultural mechanisation policy dialogue in Abuja, Nigeria.",
+    "TMF Nigeria is a national mechanization forum convening government, investors, development partners, MSPs, farmers, OEMs, and academia to advance agricultural mechanization.",
+  applicationName: "TMF Nigeria",
+  keywords: [
+    "TMF Nigeria",
+    "Mechanization Forum",
+    "Agricultural mechanization Nigeria",
+    "NAMP 2025",
+    "TMF 2026",
+    "Policy ratification dialogue",
+    "TracTrac MSL",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://tmfnigeria.com",
+    siteName: "TMF Nigeria",
+    title: "TMF Nigeria | The Mechanization Forum",
+    description:
+      "Nigeria's leading mechanization forum driving policy dialogue, investment, and implementation across the agricultural ecosystem.",
+    images: [
+      {
+        url: "/tmf-mark.png",
+        width: 512,
+        height: 512,
+        alt: "TMF Nigeria mark",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TMF Nigeria | The Mechanization Forum",
+    description:
+      "TMF Nigeria convenes public and private stakeholders to accelerate agricultural mechanization and food security.",
+    images: ["/tmf-mark.png"],
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/tmf-mark.png", type: "image/png" },
+    ],
+    apple: [{ url: "/tmf-mark.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
