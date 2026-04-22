@@ -93,6 +93,11 @@ export default function StaffHomePage() {
     });
   }, [items, search]);
 
+  function handleSignOut() {
+    localStorage.removeItem("tmf_staff_token");
+    router.replace("/staff/login");
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-6">
       <motion.section
@@ -156,14 +161,15 @@ export default function StaffHomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Link
-            href="/staff/login"
+          <motion.button
+            type="button"
+            onClick={handleSignOut}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              Switch staff account
-            </motion.span>
-          </Link>
+            Sign out
+          </motion.button>
         </motion.div>
       </motion.section>
     </main>

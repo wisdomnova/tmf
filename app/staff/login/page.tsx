@@ -3,12 +3,14 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function StaffLoginPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -59,13 +61,23 @@ export default function StaffLoginPage() {
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <label className="block text-sm">
             Staff password
-            <input
-              type="password"
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-11"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-gray-500"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+              </button>
+            </div>
           </label>
 
           {error ? <p className="text-sm text-red-300">{error}</p> : null}

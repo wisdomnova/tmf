@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import SignaturePad from "./signature-pad";
+import StaffAuthModal from "./staff-auth-modal";
+import CheckInSuccessModal from "./checkin-success-modal";
+import AlreadyCheckedInModal from "./already-checkedin-modal";
 import { motion } from "framer-motion";
 
 const API_BASE_URL =
@@ -39,17 +42,24 @@ export default function StaffCheckInPage() {
   const [signatureData, setSignatureData] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showAlreadyCheckedInModal, setShowAlreadyCheckedInModal] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     const storedToken = localStorage.getItem("tmf_staff_token");
     if (!storedToken) {
-      router.replace(`/staff/login?next=${encodeURIComponent(`/staff/check-in/${qrToken}`)}`);
+      setNeedsAuth(true);
+      setLoading(false);
       return;
     }
     setToken(storedToken);
-  }, [qrToken, router]);
+    setNeedsAuth(false);
+  }, [qrToken]);
 
   useEffect(() => {
     if (!token || !qrToken) return;
@@ -64,6 +74,12 @@ export default function StaffCheckInPage() {
     })
       .then(async (response) => {
         const data = await response.json();
+        if (response.status === 401) {
+          localStorage.removeItem("tmf_staff_token");
+          setToken("");
+          setNeedsAuth(true);
+          throw new Error("Staff authentication required");
+        }
         if (!response.ok) {
           throw new Error(data?.error || "Unable to load attendee profile");
         }
@@ -87,8 +103,38 @@ export default function StaffCheckInPage() {
     };
   }, [token, qrToken]);
 
+  async function handleModalLogin(password: string) {
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/staff/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAuthError(data?.error || "Unable to verify staff password");
+        return;
+      }
+      localStorage.setItem("tmf_staff_token", data.token);
+      setToken(data.token);
+      setNeedsAuth(false);
+      setError("");
+    } catch {
+      setAuthError("Unable to connect to backend");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   async function handleConfirmCheckIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (profile?.registration.checkedInAt) {
+      setShowAlreadyCheckedInModal(true);
+      return;
+    }
     if (!signatureData) {
       setError("Signature is required before check-in confirmation.");
       return;
@@ -116,6 +162,7 @@ export default function StaffCheckInPage() {
       }
 
       setMessage("Attendee marked present successfully.");
+      setShowSuccessModal(true);
       setProfile((current) =>
         current
           ? {
@@ -164,6 +211,24 @@ export default function StaffCheckInPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f7f7] py-8">
+      <StaffAuthModal
+        open={needsAuth}
+        loading={authLoading}
+        error={authError}
+        onSubmit={handleModalLogin}
+      />
+      <CheckInSuccessModal
+        open={showSuccessModal}
+        attendeeName={profile?.attendee.name || "Attendee"}
+        eventTitle={profile?.event.title || "TMF event"}
+        onClose={() => setShowSuccessModal(false)}
+      />
+      <AlreadyCheckedInModal
+        open={showAlreadyCheckedInModal}
+        attendeeName={profile?.attendee.name || "Attendee"}
+        checkedInAt={profile?.registration.checkedInAt || new Date().toISOString()}
+        onClose={() => setShowAlreadyCheckedInModal(false)}
+      />
       <motion.div
         className="mx-auto w-full max-w-6xl px-6"
         initial={{ opacity: 0, y: 20 }}
@@ -260,7 +325,7 @@ export default function StaffCheckInPage() {
 
                 <motion.button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || isCheckedIn}
                   className="w-full rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 md:w-auto"
                   style={{
                     background: "linear-gradient(182deg, #E12900 0%, #FA9411 100%)",
@@ -268,7 +333,11 @@ export default function StaffCheckInPage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  {submitting ? "Checking in..." : "Mark as present"}
+                  {submitting
+                    ? "Checking in..."
+                    : isCheckedIn
+                      ? "Already checked in"
+                      : "Mark as present"}
                 </motion.button>
               </form>
             </section>
