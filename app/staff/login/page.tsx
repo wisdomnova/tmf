@@ -47,14 +47,14 @@ export default function StaffLoginPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-6">
       <motion.section
-        className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-6"
+        className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <p className="text-sm text-[var(--accent-orange)]">TMF Staff Access</p>
-        <h1 className="mt-2 text-2xl font-semibold">Sign in to check-in desk</h1>
-        <p className="mt-2 text-sm text-gray-700">
+        <h1 className="mt-2 text-2xl font-semibold text-gray-800">Sign in to check-in desk</h1>
+        <p className="mt-2 text-sm text-gray-600">
           Only authenticated staff can open attendee profile check-in pages.
         </p>
 
@@ -82,15 +82,13 @@ export default function StaffLoginPage() {
 
           {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-          <motion.button
+          <button
             type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-[var(--accent-orange)] px-4 py-2 font-medium text-black disabled:opacity-60 cursor-pointer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
             {loading ? "Signing in..." : "Sign in"}
-          </motion.button>
+          </button>
         </form>
       </motion.section>
     </main>

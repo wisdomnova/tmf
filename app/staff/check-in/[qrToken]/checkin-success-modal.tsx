@@ -3,8 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { IconCircleCheck } from "@tabler/icons-react";
 
+
 type CheckInSuccessModalProps = {
-  open: boolean;
+  open: boolean; // Controls modal visibility
   attendeeName: string;
   eventTitle: string;
   onClose: () => void;
@@ -35,22 +36,19 @@ export default function CheckInSuccessModal({
             <div className="mx-auto inline-flex rounded-full border border-emerald-200 bg-emerald-50 p-3 text-emerald-600">
               <IconCircleCheck size={28} stroke={2.2} />
             </div>
-            <h2 className="mt-4 text-2xl font-semibold text-gray-900">
+            <h2 className="mt-4 text-2xl font-semibold text-gray-800">
               Check-in successful
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-gray-700">
-              <span className="font-semibold text-gray-900">{attendeeName}</span> has
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              <span className="font-semibold text-gray-800">{attendeeName}</span> has
               been marked present for {eventTitle}.
             </p>
-            <p className="mt-4 text-sm font-semibold text-gray-900">
+            <p className="mt-4 text-sm font-semibold text-gray-800">
               Have a great time at the forum.
             </p>
             <motion.button
               type="button"
-              className="mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-              style={{
-                background: "linear-gradient(182deg, #E12900 0%, #FA9411 100%)",
-              }}
+              className="mt-6 w-full rounded-lg bg-[var(--accent-orange)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-opacity-90"
               onClick={onClose}
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}

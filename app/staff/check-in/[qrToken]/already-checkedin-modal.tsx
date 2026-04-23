@@ -3,8 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { IconShieldCheck } from "@tabler/icons-react";
 
+
 type AlreadyCheckedInModalProps = {
-  open: boolean;
+  open: boolean; // Controls modal visibility
   attendeeName: string;
   checkedInAt: string;
   onClose: () => void;
@@ -35,11 +36,11 @@ export default function AlreadyCheckedInModal({
             <div className="mx-auto inline-flex rounded-full border border-[#d9e6ff] bg-[#f2f7ff] p-3 text-[#2c5fb3]">
               <IconShieldCheck size={28} stroke={2.2} />
             </div>
-            <h2 className="mt-4 text-2xl font-semibold text-gray-900">
+            <h2 className="mt-4 text-2xl font-semibold text-gray-800">
               Already checked in
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-gray-700">
-              <span className="font-semibold text-gray-900">{attendeeName}</span> has
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              <span className="font-semibold text-gray-800">{attendeeName}</span> has
               already completed check-in.
             </p>
             <p className="mt-2 text-sm text-gray-600">
@@ -47,7 +48,7 @@ export default function AlreadyCheckedInModal({
             </p>
             <motion.button
               type="button"
-              className="mt-6 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800"
+              className="mt-6 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               onClick={onClose}
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}

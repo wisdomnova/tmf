@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { IconX } from "@tabler/icons-react";
 
 type SignaturePadProps = {
-  onChange: (value: string) => void;
+  onChange: (value: string) => void; // Callback when signature changes
   height?: number;
   displayHeightClass?: string;
 };
@@ -71,7 +72,7 @@ export default function SignaturePad({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-[#f4d6c2] bg-[#fff8f4] p-3 text-xs leading-relaxed text-[#8a4b22]">
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700">
         Please sign clearly inside the box. Signature is required to complete
         check-in confirmation.
       </div>
@@ -79,7 +80,7 @@ export default function SignaturePad({
         ref={canvasRef}
         width={1400}
         height={height}
-        className={`w-full touch-none rounded-xl border border-[#e8d9cf] bg-white shadow-inner ${displayHeightClass}`}
+        className={`w-full touch-none rounded-xl border border-gray-200 bg-white shadow-inner ${displayHeightClass}`}
         onPointerDown={start}
         onPointerMove={draw}
         onPointerUp={stop}
@@ -87,11 +88,12 @@ export default function SignaturePad({
       />
       <motion.button
         type="button"
-        className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 cursor-pointer"
+        className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
         onClick={clearSignature}
         whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: 0.98 }} // Add interactive hover/tap effects
       >
+        <IconX size={16} />
         Clear signature
       </motion.button>
     </div>

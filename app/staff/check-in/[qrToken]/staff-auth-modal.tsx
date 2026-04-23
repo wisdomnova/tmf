@@ -4,8 +4,9 @@ import { FormEvent, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { IconEye, IconEyeOff, IconLock } from "@tabler/icons-react";
 
+
 type StaffAuthModalProps = {
-  open: boolean;
+  open: boolean; // Controls whether the modal is visible
   loading?: boolean;
   error?: string;
   onSubmit: (password: string) => Promise<void>;
@@ -41,11 +42,11 @@ export default function StaffAuthModal({
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#f5d2b6] bg-[#fff7f1] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#dd6d14]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#f5d2b6] bg-[#fff7f1] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-orange)]">
               <IconLock size={14} />
               Staff Access
-            </div>
-            <h2 className="mt-4 text-2xl font-semibold text-gray-900">
+            </div> {/* Decorative badge for staff access */}
+            <h2 className="mt-4 text-2xl font-semibold text-gray-800">
               Enter password to continue check-in
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
@@ -77,18 +78,15 @@ export default function StaffAuthModal({
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-              <motion.button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                style={{
-                  background: "linear-gradient(182deg, #E12900 0%, #FA9411 100%)",
-                }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {loading ? "Verifying..." : "Continue to check-in"}
-              </motion.button>
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-[var(--accent-orange)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 transition-colors hover:bg-opacity-90"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {loading ? "Verifying..." : "Continue to check-in"}
+                </motion.button>
             </form>
           </motion.section>
         </motion.div>

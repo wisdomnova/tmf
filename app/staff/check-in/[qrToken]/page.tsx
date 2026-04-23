@@ -8,6 +8,8 @@ import AlreadyCheckedInModal from "./already-checkedin-modal";
 import SignatureFullscreenModal from "./signature-fullscreen-modal";
 import { motion } from "framer-motion";
 
+import { IconArrowLeft, IconCheck, IconSignature, IconInfoCircle } from "@tabler/icons-react";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4100/api";
 
@@ -220,7 +222,7 @@ export default function StaffCheckInPage() {
   const isCheckedIn = Boolean(profile.registration.checkedInAt);
 
   return (
-    <main className="min-h-screen bg-[#f7f7f7] py-8">
+    <main className="min-h-screen bg-gray-50 py-8">
       <StaffAuthModal
         open={needsAuth}
         loading={authLoading}
@@ -253,15 +255,16 @@ export default function StaffCheckInPage() {
         <div className="mb-5">
           <button
             type="button"
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100"
             onClick={() => router.push("/staff")}
           >
+            <IconArrowLeft size={16} />
             Back to list
           </button>
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-[#1d1d1d]/10 bg-white shadow-sm">
-          <div className="bg-[#151515] px-6 py-6 text-white md:px-8">
+        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md">
+          <div className="bg-gray-800 px-6 py-6 text-white md:px-8">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FA9411]">
               Attendee Check-In
             </p>
@@ -274,7 +277,7 @@ export default function StaffCheckInPage() {
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
                   isCheckedIn
                     ? "bg-emerald-500/20 text-emerald-200 border border-emerald-300/35"
-                    : "bg-white/10 text-white border border-white/25"
+                    : "bg-gray-600/20 text-gray-200 border border-gray-500/35"
                 }`}
               >
                 {isCheckedIn
@@ -293,25 +296,25 @@ export default function StaffCheckInPage() {
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <dt className="text-xs uppercase tracking-wide text-gray-500">Organization</dt>
                   <dd className="mt-1 font-medium text-gray-900">
-                    {profile.attendee.organization || "-"}
+                    {profile.attendee.organization || <span className="text-gray-400">-</span>}
                   </dd>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <dt className="text-xs uppercase tracking-wide text-gray-500">Designation</dt>
                   <dd className="mt-1 font-medium text-gray-900">
-                    {profile.attendee.designation || "-"}
+                    {profile.attendee.designation || <span className="text-gray-400">-</span>}
                   </dd>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <dt className="text-xs uppercase tracking-wide text-gray-500">Phone</dt>
                   <dd className="mt-1 font-medium text-gray-900">
-                    {profile.attendee.phoneNumber || "-"}
+                    {profile.attendee.phoneNumber || <span className="text-gray-400">-</span>}
                   </dd>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <dt className="text-xs uppercase tracking-wide text-gray-500">Location</dt>
                   <dd className="mt-1 font-medium text-gray-900">
-                    {profile.attendee.location || "-"}
+                    {profile.attendee.location || <span className="text-gray-400">-</span>}
                   </dd>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -336,12 +339,17 @@ export default function StaffCheckInPage() {
                 <button
                   type="button"
                   onClick={() => setShowSignatureModal(true)}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
                 >
+                  <IconSignature size={16} />
                   Open full-screen signature
                 </button>
+                {error && error.includes("Signature is required") ? <p className="flex items-center gap-1 text-sm text-red-600"><IconInfoCircle size={16} /> {error}</p> : null}
+                {message ? <p className="flex items-center gap-1 text-sm text-emerald-700"><IconCheck size={16} /> {message}</p> : null}
+                
+                {/* Signature preview */}
                 <div className="mx-auto w-full max-w-xl">
-                  <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-[#e8d9cf] bg-white p-3 shadow-inner">
+                  <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-inner">
                     {signatureData ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -350,33 +358,36 @@ export default function StaffCheckInPage() {
                         className="max-h-[96px] w-full object-contain"
                       />
                     ) : (
-                      <p className="text-center text-xs text-gray-500">
-                        Signature preview will appear here after you sign in
+                      <p className="flex items-center justify-center gap-1 text-center text-xs text-gray-500">
+                        <IconSignature size={16} /> Signature preview will appear here after you sign in
                         full-screen mode.
                       </p>
                     )}
                   </div>
                 </div>
-
-                {error ? <p className="text-sm text-red-600">{error}</p> : null}
-                {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-
-                <motion.button
-                  type="submit"
-                  disabled={submitting || isCheckedIn}
-                  className="w-full rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 md:w-auto"
-                  style={{
-                    background: "linear-gradient(182deg, #E12900 0%, #FA9411 100%)",
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
+                
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/staff")}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-700 transition-colors hover:bg-gray-50 sm:min-w-[180px]"
+                  >
+                    <IconArrowLeft size={18} /> Back to dashboard
+                  </button>
+                  <motion.button
+                    type="submit"
+                    disabled={submitting || isCheckedIn}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent-orange)] px-5 text-sm font-semibold text-white disabled:opacity-60 transition-colors hover:bg-opacity-90 sm:w-auto sm:min-w-[180px]"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
                   {submitting
                     ? "Checking in..."
                     : isCheckedIn
                       ? "Already checked in"
-                      : "Mark as present"}
-                </motion.button>
+                      : <><IconCheck size={18} /> Mark as present</>}
+                  </motion.button>
+                </div>
               </form>
             </section>
           </div>

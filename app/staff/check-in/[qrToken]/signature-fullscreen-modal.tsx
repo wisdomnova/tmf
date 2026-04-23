@@ -2,9 +2,10 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import SignaturePad from "./signature-pad";
+import { IconCheck } from "@tabler/icons-react";
 
 type SignatureFullscreenModalProps = {
-  open: boolean;
+  open: boolean; // Controls modal visibility
   onClose: () => void;
   onChange: (value: string) => void;
 };
@@ -35,17 +36,27 @@ export default function SignatureFullscreenModal({
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-orange)]">
                   Signature Mode
                 </p>
-                <p className="mt-1 text-sm text-gray-700">
+                <p className="mt-1 text-sm text-gray-600">
                   Sign comfortably in full-screen mode.
                 </p>
               </div>
+              <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700"
+                className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
               >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--accent-orange)] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-opacity-90"
+              >
+                <IconCheck size={16} />
                 Done
               </button>
+            </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-5">
