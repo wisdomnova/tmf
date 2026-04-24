@@ -131,6 +131,7 @@ export default function StaffHomePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEventDatesModal, setShowEventDatesModal] = useState(false);
+  const [showEditSignatureFullscreen, setShowEditSignatureFullscreen] = useState(false);
   const [editForm, setEditForm] = useState<AttendeeForm>(initialNewForm);
   const [newForm, setNewForm] = useState<AttendeeForm>(initialNewForm);
   const [editSignatureData, setEditSignatureData] = useState("");
@@ -700,10 +701,7 @@ export default function StaffHomePage() {
               <SignatureEditorBox
                 signatureData={editSignatureData}
                 locked={editSignatureLocked}
-                onSignatureChange={(value) => {
-                  setEditSignatureData(value);
-                  setEditSignatureDirty(true);
-                }}
+                onOpenFullscreen={() => setShowEditSignatureFullscreen(true)}
               />
               <div className="mt-4 flex gap-2">
                 <button type="submit" disabled={actionLoading} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{actionLoading ? "Saving..." : "Save changes"}</button>
@@ -846,6 +844,16 @@ export default function StaffHomePage() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <SignatureFullscreenEditorModal
+        open={showEditSignatureFullscreen}
+        onClose={() => setShowEditSignatureFullscreen(false)}
+        onDone={(value) => {
+          setEditSignatureData(value);
+          setEditSignatureDirty(true);
+          setShowEditSignatureFullscreen(false);
+        }}
+      />
     </main>
   );
 }
@@ -871,10 +879,74 @@ function AttendeeFormFields({ form, setForm }: { form: AttendeeForm; setForm: (f
   );
 }
 
-function SignatureEditorBox({ signatureData, locked, onSignatureChange }: { signatureData: string; locked: boolean; onSignatureChange: (value: string) => void }) {
+function SignatureEditorBox({
+  signatureData,
+  locked,
+  onOpenFullscreen,
+}: {
+  signatureData: string;
+  locked: boolean;
+  onOpenFullscreen: () => void;
+}) {
+  if (locked) {
+    return (
+      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p className="text-sm font-medium text-gray-800">Digital Signature</p>
+        <p className="mt-1 text-xs text-gray-600">Existing signature is locked and cannot be edited.</p>
+        <div className="mt-3 min-h-[80px] rounded-md border border-gray-200 bg-white p-2">
+          {signatureData ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={signatureData} alt="Signature preview" className="max-h-[100px] w-full object-contain" />
+          ) : (
+            <p className="text-xs text-gray-400">No signature set</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="text-sm font-medium text-gray-800">Digital Signature</p>
+      <p className="mt-1 text-xs text-gray-600">
+        Please ask attendee to sign below to confirm physical attendance.
+      </p>
+      <button
+        type="button"
+        onClick={onOpenFullscreen}
+        className="mt-3 inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700"
+      >
+        <IconSignature size={14} />
+        Open full-screen signature
+      </button>
+      <div className="mt-3 min-h-[80px] rounded-md border border-gray-200 bg-white p-2">
+        {signatureData ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={signatureData} alt="Signature preview" className="max-h-[100px] w-full object-contain" />
+        ) : (
+          <p className="text-xs text-gray-400">
+            Signature preview will appear here after you sign in full-screen mode.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SignatureFullscreenEditorModal({
+  open,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: (value: string) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [draftSignature, setDraftSignature] = useState("");
 
   useEffect(() => {
+    if (!open) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -916,62 +988,74 @@ function SignatureEditorBox({ signatureData, locked, onSignatureChange }: { sign
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointerleave", up);
     };
-  }, []);
+  }, [open]);
+
+  if (!open) return null;
 
   return (
-    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-sm font-medium text-gray-800">Signature</p>
-      <p className="mt-1 text-xs text-gray-600">
-        {locked
-          ? "Existing signature is locked and cannot be edited."
-          : "Upload an image, draw a new signature, or clear existing signature."}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
-          <IconUpload size={14} /> Upload
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={locked}
-            onChange={(e) => {
-              if (locked) return;
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = () => onSignatureChange(String(reader.result || ""));
-              reader.readAsDataURL(file);
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={locked}
-          onClick={() => {
-            if (locked) return;
-            if (!canvasRef.current) return;
-            onSignatureChange(canvasRef.current.toDataURL("image/png"));
-          }}
-          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <IconSignature size={14} /> Use drawn signature
-        </button>
-        <button type="button" disabled={locked} onClick={() => onSignatureChange("")} className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
-          <IconX size={14} /> Clear
-        </button>
-      </div>
-      {!locked ? (
-        <canvas ref={canvasRef} width={600} height={140} className="mt-3 h-[110px] w-full touch-none rounded-md border border-gray-200 bg-white" />
-      ) : null}
-      <div className="mt-3 min-h-[80px] rounded-md border border-gray-200 bg-white p-2">
-        {signatureData ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={signatureData} alt="Signature preview" className="max-h-[100px] w-full object-contain" />
-        ) : (
-          <p className="text-xs text-gray-400">No signature set</p>
-        )}
-      </div>
-    </div>
+    <AnimatePresence>
+      <motion.div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 md:p-6" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+          <div className="flex items-center justify-between">
+            <p className="text-base font-semibold text-gray-800">Full-screen signature editor</p>
+            <button type="button" onClick={onClose} className="rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50">
+              <IconX size={16} />
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-600">Draw signature below or upload a signature image.</p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
+              <IconUpload size={14} /> Upload signature
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setDraftSignature(String(reader.result || ""));
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                if (!canvasRef.current) return;
+                setDraftSignature(canvasRef.current.toDataURL("image/png"));
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700"
+            >
+              <IconSignature size={14} /> Use drawn signature
+            </button>
+            <button type="button" onClick={() => setDraftSignature("")} className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
+              <IconX size={14} /> Clear
+            </button>
+          </div>
+
+          <canvas ref={canvasRef} width={1200} height={260} className="mt-3 h-[180px] w-full touch-none rounded-md border border-gray-200 bg-white" />
+          <div className="mt-3 min-h-[90px] rounded-md border border-gray-200 bg-white p-2">
+            {draftSignature ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={draftSignature} alt="Signature preview" className="max-h-[120px] w-full object-contain" />
+            ) : (
+              <p className="text-xs text-gray-400">Signature preview will appear here after you sign in full-screen mode.</p>
+            )}
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700">
+              Back to dashboard
+            </button>
+            <button type="button" onClick={() => onDone(draftSignature)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white">
+              Mark as present
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
