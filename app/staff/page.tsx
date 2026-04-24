@@ -136,6 +136,7 @@ export default function StaffHomePage() {
   const [editForm, setEditForm] = useState<AttendeeForm>(initialNewForm);
   const [newForm, setNewForm] = useState<AttendeeForm>(initialNewForm);
   const [editSignatureData, setEditSignatureData] = useState("");
+  const [editSignatureInitialData, setEditSignatureInitialData] = useState("");
   const [editSignatureDirty, setEditSignatureDirty] = useState(false);
   const [editSignatureLocked, setEditSignatureLocked] = useState(false);
   const [parsedImportRows, setParsedImportRows] = useState<AttendeeForm[]>([]);
@@ -296,6 +297,7 @@ export default function StaffHomePage() {
       status: item.attendee.status || "Pending",
     });
     setEditSignatureData("");
+    setEditSignatureInitialData("");
     setEditSignatureDirty(false);
     setEditSignatureLocked(Boolean(item.registration.hasSignatureOnFile));
     try {
@@ -310,6 +312,7 @@ export default function StaffHomePage() {
           reader.readAsDataURL(blob);
         });
         setEditSignatureData(asDataUrl);
+        setEditSignatureInitialData(asDataUrl);
         setEditSignatureLocked(true);
       }
     } catch {
@@ -331,7 +334,8 @@ export default function StaffHomePage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "Unable to update attendee");
-      if (editSignatureDirty) {
+      const signatureChanged = editSignatureData !== editSignatureInitialData;
+      if (signatureChanged) {
         const sigResponse = await fetch(`${API_BASE_URL}/staff/attendees/${editingUuid}/signature`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -340,9 +344,32 @@ export default function StaffHomePage() {
         const sigData = await sigResponse.json();
         if (!sigResponse.ok) throw new Error(sigData?.error || "Unable to update signature");
       }
-      await loadAttendees(token);
+
+      // Apply immediate in-memory update so UI reflects changes without refresh.
+      setItems((prev) =>
+        prev.map((item) =>
+          item.attendee.uuid === editingUuid
+            ? {
+                ...item,
+                attendee: {
+                  ...item.attendee,
+                  ...editForm,
+                },
+                registration: {
+                  ...item.registration,
+                  hasSignatureOnFile: signatureChanged ? Boolean(editSignatureData) : item.registration.hasSignatureOnFile,
+                },
+              }
+            : item,
+        ),
+      );
       setShowEditModal(false);
       setEditingUuid(null);
+
+      // Refresh in background; keep list visible even if network flakes.
+      loadAttendees(token).catch(() => {
+        setActionError("Saved. Could not refresh latest data right now.");
+      });
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Unable to update attendee");
     } finally {
