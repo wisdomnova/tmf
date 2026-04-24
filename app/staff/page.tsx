@@ -145,9 +145,11 @@ export default function StaffHomePage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "checked_in" | "not_checked_in" | "invited" | "not_invited">("all");
   const attendanceRelativeLabel = getAttendanceRelativeLabel(attendanceDate);
 
-  async function loadAttendees(staffToken: string) {
-    setLoading(true);
-    setError("");
+  async function loadAttendees(staffToken: string, silent = false) {
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     const filters: Record<string, string> = { eventSlug, attendanceDate, eventStartDate, eventEndDate };
     if (filterStatus === "checked_in") filters.checkedIn = "true";
     if (filterStatus === "not_checked_in") filters.checkedIn = "false";
@@ -176,7 +178,7 @@ export default function StaffHomePage() {
       setEventEndDate(String(data.event.endsAt).slice(0, 10));
     }
     setSelectedUuids([]);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   useEffect(() => {
@@ -366,10 +368,8 @@ export default function StaffHomePage() {
       setShowEditModal(false);
       setEditingUuid(null);
 
-      // Refresh in background; keep list visible even if network flakes.
-      loadAttendees(token).catch(() => {
-        setActionError("Saved. Could not refresh latest data right now.");
-      });
+      // Refresh in background silently; keep list visible even if network flakes.
+      loadAttendees(token, true).catch(() => {});
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Unable to update attendee");
     } finally {
