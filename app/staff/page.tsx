@@ -11,6 +11,9 @@ import {
   IconAlertCircle,
   IconCheck,
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCalendar,
   IconDownload,
   IconEdit,
   IconLogout,
@@ -102,6 +105,35 @@ function getAttendanceRelativeLabel(attendanceDate: string) {
   if (dayDiff <= 0) return "today";
   if (dayDiff === 1) return "yesterday";
   return `${dayDiff} days ago`;
+}
+
+function shiftDate(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+function StyledCheckbox({ checked, onChange, className = "" }: { checked: boolean; onChange: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
+        checked
+          ? "border-[var(--accent-orange)] bg-[var(--accent-orange)] text-white"
+          : "border-gray-300 bg-white text-transparent hover:border-gray-400"
+      } ${className}`}
+    >
+      <IconCheck size={13} strokeWidth={3} />
+    </button>
+  );
 }
 
 export default function StaffHomePage() {
@@ -287,6 +319,7 @@ export default function StaffHomePage() {
   }
 
   async function startEdit(item: StaffAttendeeItem) {
+    setActionError("");
     setEditingUuid(item.attendee.uuid);
     setEditForm({
       name: item.attendee.name || "",
@@ -566,30 +599,68 @@ export default function StaffHomePage() {
         <p className="text-sm text-[var(--accent-orange)]">Staff Console</p>
         <h1 className="mt-2 text-xl font-semibold text-gray-800 sm:text-2xl">Welcome to check-in desk</h1>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input value={eventSlug} onChange={(e) => setEventSlug(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Event slug (e.g. tmf-26)" />
-          <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-          <button
-            type="button"
-            onClick={() => setShowEventDatesModal(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-60 hover:bg-gray-50"
-          >
-            Edit event dates
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowImportModal(true)}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <IconUpload size={16} /> Upload CSV/Excel
-          </button>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAttendanceDate(shiftDate(attendanceDate, -1))}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Previous day"
+            >
+              <IconChevronLeft size={18} />
+            </button>
+            <div className="relative">
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+                className="h-9 rounded-lg border border-gray-300 pl-8 pr-3 text-sm"
+              />
+              <IconCalendar size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttendanceDate(shiftDate(attendanceDate, 1))}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Next day"
+            >
+              <IconChevronRight size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setAttendanceDate(watDateToday())}
+              className="ml-1 inline-flex h-9 items-center rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
+            >
+              Today
+            </button>
+          </div>
+          <p className="text-sm font-medium text-gray-700">{formatDateLabel(attendanceDate)}</p>
         </div>
-        <p className="mt-2 text-xs text-gray-600">
-          Event window: from {eventStartDate || "not set"} to {eventEndDate || "not set"}.
-        </p>
-        <p className="mt-2 text-xs text-gray-600">
-          Choose any date above to view/edit attendance for that day (including past days like yesterday).
-        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{eventSlug}</span>
+          {eventStartDate || eventEndDate ? (
+            <span className="text-xs text-gray-500">
+              Event window: {eventStartDate || "?"} &rarr; {eventEndDate || "?"}
+            </span>
+          ) : null}
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEventDatesModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              <IconEdit size={14} /> Edit event dates
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              <IconUpload size={14} /> Upload CSV/Excel
+            </button>
+          </div>
+        </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <DashboardStatCard title="Attendees" value={stats.totalAttendees} icon={<IconUsers size={20} className="text-gray-500" />} />
@@ -599,8 +670,13 @@ export default function StaffHomePage() {
           <DashboardStatCard title="Not invited" value={stats.notInvitedCount} icon={<IconUserMinus size={20} className="text-red-600" />} />
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-6 flex flex-wrap items-center gap-2">
           <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white hover:bg-opacity-90"><IconPlus size={16} /> Add new attendee</button>
+          {selectedUuids.length > 0 ? (
+            <span className="rounded-full bg-[var(--accent-orange)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent-orange)]">
+              {selectedUuids.length} selected
+            </span>
+          ) : null}
           <button
             disabled={!selectedUuids.length || actionLoading}
             onClick={() => setConfirmAction({ title: "Delete selected", message: `Delete ${selectedUuids.length} attendee(s)?`, tone: "danger", action: () => handleDeleteUuids(selectedUuids) })}
@@ -649,15 +725,15 @@ export default function StaffHomePage() {
 
           {!loading && !error && filteredItems.length ? (
             <ul>
-              <li className="sticky top-0 z-10 flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
+              <li className="sticky top-0 z-10 flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <StyledCheckbox checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
                 Select all visible ({filteredItems.length})
               </li>
               {filteredItems.map((item, index) => (
                 <li key={item.registration.qrToken} className="px-2 py-2.5 sm:px-3 sm:py-3">
                   <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex gap-3.5">
-                      <input type="checkbox" checked={selectedUuids.includes(item.attendee.uuid)} onChange={() => toggleSelect(item.attendee.uuid)} className="mt-1" />
+                      <StyledCheckbox checked={selectedUuids.includes(item.attendee.uuid)} onChange={() => toggleSelect(item.attendee.uuid)} className="mt-1" />
                       <div className="space-y-1">
                         <p className="font-medium">{index + 1}. {item.attendee.name}</p>
                         <p className="text-sm leading-6 text-gray-500 break-words">
