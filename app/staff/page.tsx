@@ -701,7 +701,10 @@ export default function StaffHomePage() {
               <SignatureEditorBox
                 signatureData={editSignatureData}
                 locked={editSignatureLocked}
-                onOpenFullscreen={() => setShowEditSignatureFullscreen(true)}
+                onOpenFullscreen={() => {
+                  setEditSignatureLocked(false);
+                  setShowEditSignatureFullscreen(true);
+                }}
               />
               <div className="mt-4 flex gap-2">
                 <button type="submit" disabled={actionLoading} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{actionLoading ? "Saving..." : "Save changes"}</button>
@@ -847,6 +850,7 @@ export default function StaffHomePage() {
 
       <SignatureFullscreenEditorModal
         open={showEditSignatureFullscreen}
+        initialValue={editSignatureData}
         onClose={() => setShowEditSignatureFullscreen(false)}
         onDone={(value) => {
           setEditSignatureData(value);
@@ -892,7 +896,15 @@ function SignatureEditorBox({
     return (
       <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
         <p className="text-sm font-medium text-gray-800">Digital Signature</p>
-        <p className="mt-1 text-xs text-gray-600">Existing signature is locked and cannot be edited.</p>
+        <p className="mt-1 text-xs text-gray-600">Existing signature is on file. You can replace it using full-screen editor.</p>
+        <button
+          type="button"
+          onClick={onOpenFullscreen}
+          className="mt-3 inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700"
+        >
+          <IconSignature size={14} />
+          Edit signature
+        </button>
         <div className="mt-3 min-h-[80px] rounded-md border border-gray-200 bg-white p-2">
           {signatureData ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -935,10 +947,12 @@ function SignatureEditorBox({
 
 function SignatureFullscreenEditorModal({
   open,
+  initialValue,
   onClose,
   onDone,
 }: {
   open: boolean;
+  initialValue?: string;
   onClose: () => void;
   onDone: (value: string) => void;
 }) {
@@ -947,6 +961,7 @@ function SignatureFullscreenEditorModal({
 
   useEffect(() => {
     if (!open) return;
+    setDraftSignature(initialValue || "");
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -988,7 +1003,7 @@ function SignatureFullscreenEditorModal({
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointerleave", up);
     };
-  }, [open]);
+  }, [open, initialValue]);
 
   if (!open) return null;
 
@@ -1050,7 +1065,7 @@ function SignatureFullscreenEditorModal({
               Back to dashboard
             </button>
             <button type="button" onClick={() => onDone(draftSignature)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white">
-              Mark as present
+              Update signature
             </button>
           </div>
         </motion.div>
