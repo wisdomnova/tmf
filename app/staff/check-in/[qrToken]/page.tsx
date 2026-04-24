@@ -27,6 +27,9 @@ type ProfileResponse = {
   registration: {
     qrToken: string;
     checkedInAt: string | null;
+    checkedInToday: boolean;
+    checkedInTodayAt: string | null;
+    hasSignatureOnFile: boolean;
   };
   event: {
     slug: string;
@@ -143,12 +146,12 @@ export default function StaffCheckInPage() {
 
   async function handleConfirmCheckIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (profile?.registration.checkedInAt) {
+    if (profile?.registration.checkedInToday) {
       setShowAlreadyCheckedInModal(true);
       return;
     }
-    if (!signatureData) {
-      setError("Signature is required before check-in confirmation.");
+    if (!profile?.registration.hasSignatureOnFile && !signatureData) {
+      setError("Signature is required before first check-in confirmation.");
       return;
     }
 
@@ -181,7 +184,9 @@ export default function StaffCheckInPage() {
               ...current,
               registration: {
                 ...current.registration,
-                checkedInAt: data.checkedInAt,
+                checkedInAt: data.checkedInAt || current.registration.checkedInAt,
+                checkedInToday: true,
+                checkedInTodayAt: data.checkedInTodayAt || data.checkedInAt || new Date().toISOString(),
               },
             }
           : current,
@@ -219,7 +224,7 @@ export default function StaffCheckInPage() {
     );
   }
 
-  const isCheckedIn = Boolean(profile.registration.checkedInAt);
+  const isCheckedInToday = Boolean(profile.registration.checkedInToday);
 
   return (
     <main className="min-h-screen bg-gray-50 py-8">
@@ -238,7 +243,7 @@ export default function StaffCheckInPage() {
       <AlreadyCheckedInModal
         open={showAlreadyCheckedInModal}
         attendeeName={profile?.attendee.name || "Attendee"}
-        checkedInAt={profile?.registration.checkedInAt || new Date().toISOString()}
+        checkedInAt={profile?.registration.checkedInTodayAt || profile?.registration.checkedInAt || new Date().toISOString()}
         onClose={() => setShowAlreadyCheckedInModal(false)}
       />
       <SignatureFullscreenModal
@@ -263,7 +268,7 @@ export default function StaffCheckInPage() {
           </button>
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md">
+        <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
           <div className="bg-gray-800 px-6 py-6 text-white md:px-8">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#FA9411]">
               Attendee Check-In
@@ -275,13 +280,12 @@ export default function StaffCheckInPage() {
             <div className="mt-4">
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-                  isCheckedIn
-                    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-300/35"
+                  isCheckedInToday ? "bg-emerald-500/20 text-emerald-200 border border-emerald-300/35"
                     : "bg-gray-600/20 text-gray-200 border border-gray-500/35"
                 }`}
               >
-                {isCheckedIn
-                  ? `Checked in ${new Date(profile.registration.checkedInAt!).toLocaleString()}`
+                {isCheckedInToday
+                  ? `Checked in ${new Date(profile.registration.checkedInTodayAt || profile.registration.checkedInAt || new Date().toISOString()).toLocaleString()}`
                   : "Pending check-in"}
               </span>
             </div>
@@ -349,7 +353,7 @@ export default function StaffCheckInPage() {
                 
                 {/* Signature preview */}
                 <div className="mx-auto w-full max-w-xl">
-                  <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-inner">
+                  <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-3">
                     {signatureData ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -359,7 +363,7 @@ export default function StaffCheckInPage() {
                       />
                     ) : (
                       <p className="flex items-center justify-center gap-1 text-center text-xs text-gray-500">
-                        <IconSignature size={16} /> Signature preview will appear here after you sign in
+                         Signature preview will appear here after you sign in
                         full-screen mode.
                       </p>
                     )}
@@ -376,15 +380,14 @@ export default function StaffCheckInPage() {
                   </button>
                   <motion.button
                     type="submit"
-                    disabled={submitting || isCheckedIn}
+                    disabled={submitting || isCheckedInToday}
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent-orange)] px-5 text-sm font-semibold text-white disabled:opacity-60 transition-colors hover:bg-opacity-90 sm:w-auto sm:min-w-[180px]"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
                   {submitting
                     ? "Checking in..."
-                    : isCheckedIn
-                      ? "Already checked in"
+                    : isCheckedInToday ? "Already checked in today"
                       : <><IconCheck size={18} /> Mark as present</>}
                   </motion.button>
                 </div>
