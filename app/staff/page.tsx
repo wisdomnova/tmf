@@ -89,6 +89,18 @@ function watDateToday() {
   }).format(new Date());
 }
 
+function getAttendanceRelativeLabel(attendanceDate: string) {
+  const today = watDateToday();
+  const todayDate = new Date(`${today}T00:00:00`);
+  const targetDate = new Date(`${attendanceDate}T00:00:00`);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const dayDiff = Math.round((todayDate.getTime() - targetDate.getTime()) / msPerDay);
+
+  if (dayDiff <= 0) return "today";
+  if (dayDiff === 1) return "yesterday";
+  return `${dayDiff} days ago`;
+}
+
 export default function StaffHomePage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -106,6 +118,8 @@ export default function StaffHomePage() {
     notInvitedCount: 0,
   });
   const [eventSlug, setEventSlug] = useState("tmf-26");
+  const [eventStartDate, setEventStartDate] = useState("2026-04-23");
+  const [eventEndDate, setEventEndDate] = useState("");
   const [attendanceDate, setAttendanceDate] = useState(watDateToday());
   const [selectedUuids, setSelectedUuids] = useState<string[]>([]);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
@@ -113,15 +127,20 @@ export default function StaffHomePage() {
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showEventDatesModal, setShowEventDatesModal] = useState(false);
   const [editForm, setEditForm] = useState<AttendeeForm>(initialNewForm);
   const [newForm, setNewForm] = useState<AttendeeForm>(initialNewForm);
+  const [parsedImportRows, setParsedImportRows] = useState<AttendeeForm[]>([]);
+  const [importFileName, setImportFileName] = useState("");
 
   const [filterStatus, setFilterStatus] = useState<"all" | "checked_in" | "not_checked_in" | "invited" | "not_invited">("all");
+  const attendanceRelativeLabel = getAttendanceRelativeLabel(attendanceDate);
 
   async function loadAttendees(staffToken: string) {
     setLoading(true);
     setError("");
-    const filters: Record<string, string> = { eventSlug, attendanceDate };
+    const filters: Record<string, string> = { eventSlug, attendanceDate, eventStartDate, eventEndDate };
     if (filterStatus === "checked_in") filters.checkedIn = "true";
     if (filterStatus === "not_checked_in") filters.checkedIn = "false";
     if (filterStatus === "invited") filters.invitationStatus = "invited";
@@ -142,6 +161,12 @@ export default function StaffHomePage() {
       invitedCount: data.stats?.invitedCount || 0,
       notInvitedCount: data.stats?.notInvitedCount || 0,
     });
+    if (data.event?.startsAt) {
+      setEventStartDate(String(data.event.startsAt).slice(0, 10));
+    }
+    if (data.event?.endsAt) {
+      setEventEndDate(String(data.event.endsAt).slice(0, 10));
+    }
     setSelectedUuids([]);
     setLoading(false);
   }
@@ -157,7 +182,27 @@ export default function StaffHomePage() {
       setError(e instanceof Error ? e.message : "Unable to load attendees");
       setLoading(false);
     });
-  }, [router, filterStatus, eventSlug, attendanceDate]);
+  }, [router, filterStatus, eventSlug, attendanceDate, eventStartDate, eventEndDate]);
+
+  async function handleSaveEventDates() {
+    if (!token) return;
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/staff/events/dates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ eventSlug, eventStartDate: eventStartDate || undefined, eventEndDate: eventEndDate || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Unable to save event dates");
+      await loadAttendees(token);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Unable to save event dates");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -206,7 +251,7 @@ export default function StaffHomePage() {
       const primary = await fetch(`${API_BASE_URL}/staff/attendees`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ attendee: newForm, eventSlug }),
+        body: JSON.stringify({ attendee: newForm, eventSlug, eventStartDate, eventEndDate }),
       });
 
       // Fallback for stale backend deployments missing /staff/attendees.
@@ -215,7 +260,7 @@ export default function StaffHomePage() {
           ? await fetch(`${API_BASE_URL}/attendees/register`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ attendee: newForm, eventSlug }),
+              body: JSON.stringify({ attendee: newForm, eventSlug, eventStartDate, eventEndDate }),
             })
           : primary;
 
@@ -307,7 +352,7 @@ export default function StaffHomePage() {
       const response = await fetch(`${API_BASE_URL}/staff/attendance/check-in`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventSlug, uuids, attendanceDate }),
+        body: JSON.stringify({ eventSlug, eventStartDate, eventEndDate, uuids, attendanceDate }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "Unable to mark attendance");
@@ -318,26 +363,6 @@ export default function StaffHomePage() {
     } finally {
       setActionLoading(false);
     }
-  }
-
-  async function handleDownloadSignatures(uuids: string[]) {
-    if (!token) return;
-    const qs = new URLSearchParams({ eventSlug });
-    if (uuids.length) qs.set("uuids", uuids.join(","));
-
-    const response = await fetch(`${API_BASE_URL}/staff/signatures/export?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error("Unable to export signatures");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${eventSlug}-signatures.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   }
 
   function getAttendeeRowsForExport(source: StaffAttendeeItem[]) {
@@ -356,7 +381,7 @@ export default function StaffHomePage() {
     }));
   }
 
-  function exportAttendeesSheet(format: "csv" | "xlsx", selectedOnly: boolean) {
+  function exportAttendeesSheet(selectedOnly: boolean) {
     const base = selectedOnly
       ? filteredItems.filter((item) => selectedUuids.includes(item.attendee.uuid))
       : items;
@@ -372,21 +397,48 @@ export default function StaffHomePage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "attendees");
     const safeDate = attendanceDate || watDateToday();
     const scope = selectedOnly ? "selected" : "all";
-    const fileName = `${eventSlug}-${safeDate}-${scope}-attendees.${format}`;
-    XLSX.writeFile(workbook, fileName, { bookType: format });
+    const fileName = `${eventSlug}-${safeDate}-${scope}-attendees.xlsx`;
+    XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
   }
 
-  async function handleImportFile(file: File) {
+  async function handleDownloadSignature(uuid: string, name: string) {
     if (!token) return;
-    setActionLoading(true);
-    setActionError("");
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
+    const response = await fetch(`${API_BASE_URL}/staff/attendees/${uuid}/signature?eventSlug=${eventSlug}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Signature not found");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name.toLowerCase().replace(/\s+/g, "-")}-signature.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
-      const attendees = rows.map((row) => ({
+  async function handleDownloadSelectedSignatures(uuids: string[]) {
+    if (!token || !uuids.length) return;
+    const qs = new URLSearchParams({ eventSlug, uuids: uuids.join(",") });
+    const response = await fetch(`${API_BASE_URL}/staff/signatures/export?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Unable to export selected signatures");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${eventSlug}-selected-signatures.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function normalizeImportedRows(rows: Record<string, unknown>[]): AttendeeForm[] {
+    return rows
+      .map((row) => ({
         name: String(row.name || row.Name || "").trim(),
         organization: String(row.organization || row.Organization || "").trim(),
         designation: String(row.designation || row.Designation || "").trim(),
@@ -395,19 +447,49 @@ export default function StaffHomePage() {
         location: String(row.location || row.Location || "").trim(),
         invitationStatus:
           String(row.invitationStatus || row.invitation_status || "invited").trim() === "not_invited"
-            ? "not_invited"
-            : "invited",
+            ? ("not_invited" as const)
+            : ("invited" as const),
         status: String(row.status || row.Status || "Pending").trim() || "Pending",
-      })).filter((row) => row.name);
+      }))
+      .filter((row) => row.name);
+  }
 
+  async function handleParseImportFile(file: File) {
+    setActionError("");
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
+      const attendees = normalizeImportedRows(rows);
+      if (!attendees.length) {
+        throw new Error("No valid rows found. Ensure at least the name column is provided.");
+      }
+      setParsedImportRows(attendees);
+      setImportFileName(file.name);
+    } catch (e: unknown) {
+      setParsedImportRows([]);
+      setImportFileName("");
+      setActionError(e instanceof Error ? e.message : "Unable to parse import file");
+    }
+  }
+
+  async function handleImportConfirm() {
+    if (!token || !parsedImportRows.length) return;
+    setActionLoading(true);
+    setActionError("");
+    try {
       const response = await fetch(`${API_BASE_URL}/staff/attendees/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventSlug, attendees }),
+        body: JSON.stringify({ eventSlug, eventStartDate, eventEndDate, attendees: parsedImportRows }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Import failed");
       await loadAttendees(token);
+      setShowImportModal(false);
+      setParsedImportRows([]);
+      setImportFileName("");
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Import failed");
     } finally {
@@ -416,7 +498,7 @@ export default function StaffHomePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+    <main className="min-h-screen w-full px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
       <motion.section className="w-full rounded-2xl border border-gray-200 bg-white p-4 sm:p-6" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
         <p className="text-sm text-[var(--accent-orange)]">Staff Console</p>
         <h1 className="mt-2 text-xl font-semibold text-gray-800 sm:text-2xl">Welcome to check-in desk</h1>
@@ -424,30 +506,32 @@ export default function StaffHomePage() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input value={eventSlug} onChange={(e) => setEventSlug(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Event slug (e.g. tmf-26)" />
           <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+          <button
+            type="button"
+            onClick={() => setShowEventDatesModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-60 hover:bg-gray-50"
+          >
+            Edit event dates
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
             <IconUpload size={16} /> Upload CSV/Excel
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportFile(file);
-              }}
-            />
-          </label>
-          <button onClick={() => handleDownloadSignatures([]).catch((e) => setActionError(e.message))} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-            <IconDownload size={16} /> Download all signatures
           </button>
         </div>
+        <p className="mt-2 text-xs text-gray-600">
+          Event window: from {eventStartDate || "not set"} to {eventEndDate || "not set"}.
+        </p>
         <p className="mt-2 text-xs text-gray-600">
           Choose any date above to view/edit attendance for that day (including past days like yesterday).
         </p>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <DashboardStatCard title="Attendees" value={stats.totalAttendees} icon={<IconUsers size={20} className="text-gray-500" />} />
-          <DashboardStatCard title="Checked in today" value={stats.checkedInCount} icon={<IconUserCheck size={20} className="text-emerald-600" />} />
-          <DashboardStatCard title="Not checked in today" value={stats.notCheckedInCount} icon={<IconAlertCircle size={20} className="text-amber-600" />} />
+          <DashboardStatCard title={`Checked in ${attendanceRelativeLabel}`} value={stats.checkedInCount} icon={<IconUserCheck size={20} className="text-emerald-600" />} />
+          <DashboardStatCard title={`Not checked in ${attendanceRelativeLabel}`} value={stats.notCheckedInCount} icon={<IconAlertCircle size={20} className="text-amber-600" />} />
           <DashboardStatCard title="Invited" value={stats.invitedCount} icon={<IconUsers size={20} className="text-blue-600" />} />
           <DashboardStatCard title="Not invited" value={stats.notInvitedCount} icon={<IconUserMinus size={20} className="text-red-600" />} />
         </div>
@@ -466,35 +550,10 @@ export default function StaffHomePage() {
           ><IconCheck size={16} /> Mark selected present</button>
           <button
             disabled={!selectedUuids.length || actionLoading}
-            onClick={() => handleDownloadSignatures(selectedUuids).catch((e) => setActionError(e.message))}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50"
-          ><IconDownload size={16} /> Download selected</button>
-          <button
-            onClick={() => exportAttendeesSheet("csv", false)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
-          >
-            <IconDownload size={16} /> Export all CSV
-          </button>
-          <button
-            onClick={() => exportAttendeesSheet("xlsx", false)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
-          >
-            <IconDownload size={16} /> Export all Excel
-          </button>
-          <button
-            disabled={!selectedUuids.length}
-            onClick={() => exportAttendeesSheet("csv", true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50"
-          >
-            <IconDownload size={16} /> Export selected CSV
-          </button>
-          <button
-            disabled={!selectedUuids.length}
-            onClick={() => exportAttendeesSheet("xlsx", true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50"
-          >
-            <IconDownload size={16} /> Export selected Excel
-          </button>
+            onClick={() => handleDownloadSelectedSignatures(selectedUuids).catch((e) => setActionError(e.message))}
+            title={!selectedUuids.length ? "Select attendees first" : undefined}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none"
+          ><IconDownload size={16} /> Download selected signatures</button>
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -520,7 +579,7 @@ export default function StaffHomePage() {
 
         {actionError ? <p className="mt-3 text-sm text-red-600">{actionError}</p> : null}
 
-        <div className="mt-4 max-h-[62vh] overflow-auto rounded-lg border border-gray-200 bg-white">
+        <div className="mt-4 max-h-[72vh] overflow-auto rounded-lg border border-gray-200 bg-white">
           {loading ? <div className="p-4 text-sm text-gray-600">Loading attendees...</div> : null}
           {!loading && error ? <div className="p-4 text-sm text-red-600">{error}</div> : null}
           {!loading && !error && !filteredItems.length ? <div className="p-4 text-sm text-gray-600">No attendees found.</div> : null}
@@ -532,13 +591,13 @@ export default function StaffHomePage() {
                 Select all visible ({filteredItems.length})
               </li>
               {filteredItems.map((item, index) => (
-                <li key={item.registration.qrToken} className="px-2 py-2 sm:px-3">
-                  <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:justify-between">
-                    <div className="flex gap-3">
+                <li key={item.registration.qrToken} className="px-2 py-2.5 sm:px-3 sm:py-3">
+                  <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex gap-3.5">
                       <input type="checkbox" checked={selectedUuids.includes(item.attendee.uuid)} onChange={() => toggleSelect(item.attendee.uuid)} className="mt-1" />
-                      <div>
+                      <div className="space-y-1">
                         <p className="font-medium">{index + 1}. {item.attendee.name}</p>
-                        <p className="text-xs leading-5 text-gray-500 break-words">
+                        <p className="text-sm leading-6 text-gray-500 break-words">
                           {item.attendee.organization || "No organization"} · {item.attendee.phoneNumber || "No phone"} ·{" "}
                           <span
                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -547,17 +606,27 @@ export default function StaffHomePage() {
                                 : "bg-orange-100 text-orange-800"
                             }`}
                           >
-                            {item.registration.checkedInToday ? "Checked in" : "Not checked in today"}
+                            {item.registration.checkedInToday ? `Checked in ${attendanceRelativeLabel}` : `Not checked in ${attendanceRelativeLabel}`}
+                          </span>{" "}
+                          ·{" "}
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              item.registration.hasSignatureOnFile
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {item.registration.hasSignatureOnFile ? "Signed" : "No signature"}
                           </span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                      <button onClick={() => setConfirmAction({ title: "Mark present", message: `Mark ${item.attendee.name} present for ${attendanceDate} without signature?`, action: () => handleBulkCheckIn([item.attendee.uuid]) })} className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 px-3 text-xs">Check in</button>
-                      <Link href={`/staff/check-in/${item.registration.qrToken}`} target="_blank" className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs">Open</Link>
-                      <button onClick={() => startEdit(item)} className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 px-3 text-xs"><IconEdit size={14} />Edit</button>
-                      <button onClick={() => handleDownloadSignatures([item.attendee.uuid]).catch((e) => setActionError(e.message))} className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 px-3 text-xs"><IconDownload size={14} />Signature</button>
-                      <button onClick={() => setConfirmAction({ title: "Delete attendee", message: `Delete ${item.attendee.name}?`, tone: "danger", action: () => handleDeleteUuids([item.attendee.uuid]) })} className="inline-flex h-9 items-center gap-1 rounded-md border border-red-200 px-3 text-xs text-red-700"><IconTrash size={14} />Delete</button>
+                    <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-3 lg:grid-cols-5">
+                      <button onClick={() => setConfirmAction({ title: "Mark present", message: `Mark ${item.attendee.name} present for ${attendanceDate} without signature?`, action: () => handleBulkCheckIn([item.attendee.uuid]) })} className="inline-flex h-10 items-center justify-center gap-1 rounded-md border border-gray-300 px-3 text-xs">Check in</button>
+                      <Link href={`/staff/check-in/${item.registration.qrToken}`} target="_blank" className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-xs">Open</Link>
+                      <button onClick={() => startEdit(item)} className="inline-flex h-10 items-center justify-center gap-1 rounded-md border border-gray-300 px-3 text-xs"><IconEdit size={14} />Edit</button>
+                      <button onClick={() => handleDownloadSignature(item.attendee.uuid, item.attendee.name).catch((e) => setActionError(e.message))} className="inline-flex h-10 items-center justify-center gap-1 rounded-md border border-gray-300 px-3 text-xs"><IconDownload size={14} />Signature</button>
+                      <button onClick={() => setConfirmAction({ title: "Delete attendee", message: `Delete ${item.attendee.name}?`, tone: "danger", action: () => handleDeleteUuids([item.attendee.uuid]) })} className="inline-flex h-10 items-center justify-center gap-1 rounded-md border border-red-200 px-3 text-xs text-red-700"><IconTrash size={14} />Delete</button>
                     </div>
                   </div>
                 </li>
@@ -599,6 +668,139 @@ export default function StaffHomePage() {
                 <button type="button" onClick={() => setShowEditModal(false)} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"><IconX size={18} />Cancel</button>
               </div>
             </motion.form>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showImportModal ? (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white p-5 md:p-6" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.98 }}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-base font-semibold text-gray-800">Upload attendee list</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Accepted formats: CSV, XLSX, XLS. Required field: <span className="font-medium">name</span>.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setShowImportModal(false)} className="inline-flex rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50">
+                  <IconX size={16} />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+                <p className="font-medium text-gray-800">Column format we accept</p>
+                <p className="mt-1">name, organization, designation, emailAddress (or email), phoneNumber (or phone), location, invitationStatus, status</p>
+                <p className="mt-1">Header names are case-insensitive and common variants are supported.</p>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm text-gray-700">
+                  Event start date (optional, for new events)
+                  <input
+                    type="date"
+                    value={eventStartDate}
+                    onChange={(e) => setEventStartDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="mt-3 block text-sm text-gray-700">
+                  Event end date (optional)
+                  <input
+                    type="date"
+                    value={eventEndDate}
+                    onChange={(e) => setEventEndDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <IconUpload size={16} /> Choose file
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleParseImportFile(file);
+                  }}
+                />
+              </label>
+
+              {importFileName ? (
+                <p className="mt-3 text-sm text-gray-700">
+                  Parsed <span className="font-medium">{parsedImportRows.length}</span> rows from <span className="font-medium">{importFileName}</span>.
+                </p>
+              ) : (
+                <p className="mt-3 text-sm text-gray-500">No file parsed yet.</p>
+              )}
+
+              {parsedImportRows.length ? (
+                <div className="mt-3 max-h-40 overflow-auto rounded-lg border border-gray-200">
+                  <ul className="divide-y divide-gray-100 text-sm">
+                    {parsedImportRows.slice(0, 8).map((row, idx) => (
+                      <li key={`${row.name}-${idx}`} className="px-3 py-2 text-gray-700">
+                        {idx + 1}. {row.name} {row.organization ? `· ${row.organization}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!parsedImportRows.length || actionLoading}
+                  onClick={handleImportConfirm}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {actionLoading ? "Uploading..." : "Upload parsed rows"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setParsedImportRows([]);
+                    setImportFileName("");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEventDatesModal ? (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 md:p-6" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.98 }}>
+              <p className="text-base font-semibold text-gray-800">Edit event dates</p>
+              <p className="mt-1 text-sm text-gray-600">Set the event date range for <span className="font-medium">{eventSlug}</span>.</p>
+
+              <div className="mt-4 space-y-3">
+                <label className="block text-sm text-gray-700">
+                  Event start date
+                  <input type="date" value={eventStartDate} onChange={(e) => setEventStartDate(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </label>
+                <label className="block text-sm text-gray-700">
+                  Event end date
+                  <input type="date" value={eventEndDate} onChange={(e) => setEventEndDate(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </label>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={async () => { await handleSaveEventDates(); setShowEventDatesModal(false); }} disabled={actionLoading} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                  {actionLoading ? "Saving..." : "Save dates"}
+                </button>
+                <button type="button" onClick={() => setShowEventDatesModal(false)} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700">
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>
