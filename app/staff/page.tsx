@@ -531,15 +531,24 @@ export default function StaffHomePage() {
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
                 Select all visible ({filteredItems.length})
               </li>
-              {filteredItems.map((item) => (
+              {filteredItems.map((item, index) => (
                 <li key={item.registration.qrToken} className="px-2 py-2 sm:px-3">
                   <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:justify-between">
                     <div className="flex gap-3">
                       <input type="checkbox" checked={selectedUuids.includes(item.attendee.uuid)} onChange={() => toggleSelect(item.attendee.uuid)} className="mt-1" />
                       <div>
-                        <p className="font-medium">{item.attendee.name}</p>
+                        <p className="font-medium">{index + 1}. {item.attendee.name}</p>
                         <p className="text-xs leading-5 text-gray-500 break-words">
-                          {item.attendee.organization || "No organization"} · {item.attendee.phoneNumber || "No phone"} · {item.registration.checkedInToday ? "Checked in" : "Not checked in today"}
+                          {item.attendee.organization || "No organization"} · {item.attendee.phoneNumber || "No phone"} ·{" "}
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              item.registration.checkedInToday
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-orange-100 text-orange-800"
+                            }`}
+                          >
+                            {item.registration.checkedInToday ? "Checked in" : "Not checked in today"}
+                          </span>
                         </p>
                       </div>
                     </div>
