@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import * as XLSX from "xlsx";
+import SignaturePad from "./check-in/[qrToken]/signature-pad";
 import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
@@ -956,120 +957,66 @@ function SignatureFullscreenEditorModal({
   onClose: () => void;
   onDone: (value: string) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [draftSignature, setDraftSignature] = useState("");
 
   useEffect(() => {
-    if (!open) return;
-    setDraftSignature(initialValue || "");
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#111827";
-    ctx.lineWidth = 2;
-
-    let drawing = false;
-    const point = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    };
-
-    const down = (event: PointerEvent) => {
-      drawing = true;
-      const p = point(event);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-    };
-    const move = (event: PointerEvent) => {
-      if (!drawing) return;
-      const p = point(event);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-    };
-    const up = () => {
-      drawing = false;
-    };
-
-    canvas.addEventListener("pointerdown", down);
-    canvas.addEventListener("pointermove", move);
-    canvas.addEventListener("pointerup", up);
-    canvas.addEventListener("pointerleave", up);
-    return () => {
-      canvas.removeEventListener("pointerdown", down);
-      canvas.removeEventListener("pointermove", move);
-      canvas.removeEventListener("pointerup", up);
-      canvas.removeEventListener("pointerleave", up);
-    };
+    if (open) setDraftSignature(initialValue || "");
   }, [open, initialValue]);
-
-  if (!open) return null;
 
   return (
     <AnimatePresence>
-      <motion.div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <motion.div className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 md:p-6" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-          <div className="flex items-center justify-between">
-            <p className="text-base font-semibold text-gray-800">Full-screen signature editor</p>
-            <button type="button" onClick={onClose} className="rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50">
-              <IconX size={16} />
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-gray-600">Draw signature below or upload a signature image.</p>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-[96] flex max-h-screen items-center justify-center overflow-hidden bg-black/50 px-4 py-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.section
+            className="w-full max-w-5xl overflow-hidden rounded-2xl border border-white/20 bg-[#f7f7f7] p-4 shadow-2xl md:p-6"
+            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-orange)]">
+                  Signature Mode
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Sign comfortably in full-screen mode.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDone(draftSignature)}
+                  className="inline-flex items-center gap-2 rounded-md bg-[var(--accent-orange)] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-opacity-90"
+                >
+                  <IconCheck size={16} />
+                  Update signature
+                </button>
+              </div>
+            </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
-              <IconUpload size={14} /> Upload signature
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => setDraftSignature(String(reader.result || ""));
-                  reader.readAsDataURL(file);
-                }}
+            <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-5">
+              <SignaturePad
+                onChange={setDraftSignature}
+                height={700}
+                displayHeightClass="h-[360px] md:h-[460px]"
               />
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                if (!canvasRef.current) return;
-                setDraftSignature(canvasRef.current.toDataURL("image/png"));
-              }}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700"
-            >
-              <IconSignature size={14} /> Use drawn signature
-            </button>
-            <button type="button" onClick={() => setDraftSignature("")} className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
-              <IconX size={14} /> Clear
-            </button>
-          </div>
-
-          <canvas ref={canvasRef} width={1200} height={260} className="mt-3 h-[180px] w-full touch-none rounded-md border border-gray-200 bg-white" />
-          <div className="mt-3 min-h-[90px] rounded-md border border-gray-200 bg-white p-2">
-            {draftSignature ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={draftSignature} alt="Signature preview" className="max-h-[120px] w-full object-contain" />
-            ) : (
-              <p className="text-xs text-gray-400">Signature preview will appear here after you sign in full-screen mode.</p>
-            )}
-          </div>
-
-          <div className="mt-4 flex gap-2">
-            <button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700">
-              Back to dashboard
-            </button>
-            <button type="button" onClick={() => onDone(draftSignature)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white">
-              Update signature
-            </button>
-          </div>
+            </div>
+          </motion.section>
         </motion.div>
-      </motion.div>
+      ) : null}
     </AnimatePresence>
   );
 }
