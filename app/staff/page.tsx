@@ -108,9 +108,12 @@ function getAttendanceRelativeLabel(attendanceDate: string) {
 }
 
 function shiftDate(dateStr: string, days: number) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
 function formatDateLabel(dateStr: string) {
@@ -499,6 +502,7 @@ export default function StaffHomePage() {
 
   async function handleDownloadSignature(uuid: string, name: string) {
     if (!token) return;
+    setActionError("");
     const response = await fetch(`${API_BASE_URL}/staff/attendees/${uuid}/signature?eventSlug=${eventSlug}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -516,20 +520,28 @@ export default function StaffHomePage() {
 
   async function handleDownloadSelectedSignatures(uuids: string[]) {
     if (!token || !uuids.length) return;
-    const qs = new URLSearchParams({ eventSlug, uuids: uuids.join(",") });
-    const response = await fetch(`${API_BASE_URL}/staff/signatures/export?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error("Unable to export selected signatures");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${eventSlug}-selected-signatures.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    setActionError("");
+    setActionLoading(true);
+    try {
+      const qs = new URLSearchParams({ eventSlug, uuids: uuids.join(",") });
+      const response = await fetch(`${API_BASE_URL}/staff/signatures/export?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Unable to export selected signatures");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${eventSlug}-selected-signatures.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   function normalizeImportedRows(rows: Record<string, unknown>[]): AttendeeForm[] {
@@ -671,7 +683,7 @@ export default function StaffHomePage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white hover:bg-opacity-90"><IconPlus size={16} /> Add new attendee</button>
+          <button onClick={() => { setActionError(""); setShowAddModal(true); }} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white hover:bg-opacity-90"><IconPlus size={16} /> Add new attendee</button>
           {selectedUuids.length > 0 ? (
             <span className="rounded-full bg-[var(--accent-orange)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent-orange)]">
               {selectedUuids.length} selected
@@ -679,17 +691,17 @@ export default function StaffHomePage() {
           ) : null}
           <button
             disabled={!selectedUuids.length || actionLoading}
-            onClick={() => setConfirmAction({ title: "Delete selected", message: `Delete ${selectedUuids.length} attendee(s)?`, tone: "danger", action: () => handleDeleteUuids(selectedUuids) })}
+            onClick={() => { setActionError(""); setConfirmAction({ title: "Delete selected", message: `Delete ${selectedUuids.length} attendee(s)?`, tone: "danger", action: () => handleDeleteUuids(selectedUuids) }); }}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50"
           ><IconTrash size={16} /> Delete selected</button>
           <button
             disabled={!selectedUuids.length || actionLoading}
-            onClick={() => setConfirmAction({ title: "Mark selected present", message: `Mark ${selectedUuids.length} attendee(s) as present for ${attendanceDate}?`, action: () => handleBulkCheckIn(selectedUuids) })}
+            onClick={() => { setActionError(""); setConfirmAction({ title: "Mark selected present", message: `Mark ${selectedUuids.length} attendee(s) as present for ${attendanceDate}?`, action: () => handleBulkCheckIn(selectedUuids) }); }}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50"
           ><IconCheck size={16} /> Mark selected present</button>
           <button
             disabled={!selectedUuids.length || actionLoading}
-            onClick={() => handleDownloadSelectedSignatures(selectedUuids).catch((e) => setActionError(e.message))}
+            onClick={() => handleDownloadSelectedSignatures(selectedUuids)}
             title={!selectedUuids.length ? "Select attendees first" : undefined}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none"
           ><IconDownload size={16} /> Download selected signatures</button>
