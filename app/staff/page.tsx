@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import * as XLSX from "xlsx";
@@ -9,6 +9,7 @@ import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
   IconCheck,
+  IconChevronDown,
   IconDownload,
   IconEdit,
   IconLogout,
@@ -20,6 +21,7 @@ import {
   IconUserMinus,
   IconUsers,
   IconX,
+  IconSignature,
 } from "@tabler/icons-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4100/api";
@@ -131,6 +133,9 @@ export default function StaffHomePage() {
   const [showEventDatesModal, setShowEventDatesModal] = useState(false);
   const [editForm, setEditForm] = useState<AttendeeForm>(initialNewForm);
   const [newForm, setNewForm] = useState<AttendeeForm>(initialNewForm);
+  const [editSignatureData, setEditSignatureData] = useState("");
+  const [editSignatureDirty, setEditSignatureDirty] = useState(false);
+  const [editSignatureLocked, setEditSignatureLocked] = useState(false);
   const [parsedImportRows, setParsedImportRows] = useState<AttendeeForm[]>([]);
   const [importFileName, setImportFileName] = useState("");
 
@@ -276,7 +281,7 @@ export default function StaffHomePage() {
     }
   }
 
-  function startEdit(item: StaffAttendeeItem) {
+  async function startEdit(item: StaffAttendeeItem) {
     setEditingUuid(item.attendee.uuid);
     setEditForm({
       name: item.attendee.name || "",
@@ -288,6 +293,26 @@ export default function StaffHomePage() {
       invitationStatus: item.attendee.invitationStatus || "invited",
       status: item.attendee.status || "Pending",
     });
+    setEditSignatureData("");
+    setEditSignatureDirty(false);
+    setEditSignatureLocked(Boolean(item.registration.hasSignatureOnFile));
+    try {
+      const response = await fetch(`${API_BASE_URL}/staff/attendees/${item.attendee.uuid}/signature?eventSlug=${eventSlug}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const asDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.readAsDataURL(blob);
+        });
+        setEditSignatureData(asDataUrl);
+        setEditSignatureLocked(true);
+      }
+    } catch {
+      // non-fatal: editing can continue without preloaded signature
+    }
     setShowEditModal(true);
   }
 
@@ -304,6 +329,15 @@ export default function StaffHomePage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "Unable to update attendee");
+      if (editSignatureDirty) {
+        const sigResponse = await fetch(`${API_BASE_URL}/staff/attendees/${editingUuid}/signature`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ eventSlug, signatureData: editSignatureData || "" }),
+        });
+        const sigData = await sigResponse.json();
+        if (!sigResponse.ok) throw new Error(sigData?.error || "Unable to update signature");
+      }
       await loadAttendees(token);
       setShowEditModal(false);
       setEditingUuid(null);
@@ -663,6 +697,14 @@ export default function StaffHomePage() {
             <motion.form onSubmit={handleSaveEdit} className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white p-5 md:p-6">
               <p className="text-base font-semibold text-gray-800">Edit attendee</p>
               <AttendeeFormFields form={editForm} setForm={setEditForm} />
+              <SignatureEditorBox
+                signatureData={editSignatureData}
+                locked={editSignatureLocked}
+                onSignatureChange={(value) => {
+                  setEditSignatureData(value);
+                  setEditSignatureDirty(true);
+                }}
+              />
               <div className="mt-4 flex gap-2">
                 <button type="submit" disabled={actionLoading} className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-orange)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{actionLoading ? "Saving..." : "Save changes"}</button>
                 <button type="button" onClick={() => setShowEditModal(false)} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"><IconX size={18} />Cancel</button>
@@ -817,8 +859,118 @@ function AttendeeFormFields({ form, setForm }: { form: AttendeeForm; setForm: (f
       <input type="email" className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Email" value={form.emailAddress} onChange={(e) => setForm((p) => ({ ...p, emailAddress: e.target.value }))} />
       <input className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Phone" value={form.phoneNumber} onChange={(e) => setForm((p) => ({ ...p, phoneNumber: e.target.value }))} />
       <input className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Location" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} />
-      <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={form.invitationStatus} onChange={(e) => setForm((p) => ({ ...p, invitationStatus: e.target.value as "invited" | "not_invited" }))}><option value="invited">Invited</option><option value="not_invited">Not invited</option></select>
-      <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}><option value="Pending">Pending</option><option value="Confirmed">Confirmed</option></select>
+      <div className="relative">
+        <select className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm" value={form.invitationStatus} onChange={(e) => setForm((p) => ({ ...p, invitationStatus: e.target.value as "invited" | "not_invited" }))}><option value="invited">Invited</option><option value="not_invited">Not invited</option></select>
+        <IconChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      </div>
+      <div className="relative">
+        <select className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}><option value="Pending">Pending</option><option value="Confirmed">Confirmed</option></select>
+        <IconChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      </div>
+    </div>
+  );
+}
+
+function SignatureEditorBox({ signatureData, locked, onSignatureChange }: { signatureData: string; locked: boolean; onSignatureChange: (value: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2;
+
+    let drawing = false;
+    const point = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+
+    const down = (event: PointerEvent) => {
+      drawing = true;
+      const p = point(event);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    };
+    const move = (event: PointerEvent) => {
+      if (!drawing) return;
+      const p = point(event);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    };
+    const up = () => {
+      drawing = false;
+    };
+
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointerleave", up);
+    return () => {
+      canvas.removeEventListener("pointerdown", down);
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointerleave", up);
+    };
+  }, []);
+
+  return (
+    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="text-sm font-medium text-gray-800">Signature</p>
+      <p className="mt-1 text-xs text-gray-600">
+        {locked
+          ? "Existing signature is locked and cannot be edited."
+          : "Upload an image, draw a new signature, or clear existing signature."}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700">
+          <IconUpload size={14} /> Upload
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={locked}
+            onChange={(e) => {
+              if (locked) return;
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => onSignatureChange(String(reader.result || ""));
+              reader.readAsDataURL(file);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => {
+            if (locked) return;
+            if (!canvasRef.current) return;
+            onSignatureChange(canvasRef.current.toDataURL("image/png"));
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <IconSignature size={14} /> Use drawn signature
+        </button>
+        <button type="button" disabled={locked} onClick={() => onSignatureChange("")} className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <IconX size={14} /> Clear
+        </button>
+      </div>
+      {!locked ? (
+        <canvas ref={canvasRef} width={600} height={140} className="mt-3 h-[110px] w-full touch-none rounded-md border border-gray-200 bg-white" />
+      ) : null}
+      <div className="mt-3 min-h-[80px] rounded-md border border-gray-200 bg-white p-2">
+        {signatureData ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={signatureData} alt="Signature preview" className="max-h-[100px] w-full object-contain" />
+        ) : (
+          <p className="text-xs text-gray-400">No signature set</p>
+        )}
+      </div>
     </div>
   );
 }
